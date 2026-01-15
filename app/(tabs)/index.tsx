@@ -7,15 +7,18 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Speech from 'expo-speech';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
+// Firebase Imports
+import { auth, db } from '../../firebaseConfig';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { signOut } from 'firebase/auth';
+import { useRouter } from 'expo-router';
+
 const { width } = Dimensions.get('window');
 
 export default function FarmerApp() {
-  // Authentication State
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const router = useRouter();
 
-  // App State - Gyaran Types don kawar da "Problems"
+  // App State
   const [image, setImage] = useState<string | null>(null);
   const [base64Image, setBase64Image] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -38,9 +41,15 @@ export default function FarmerApp() {
   }, []);
 
   // --- Functions ---
-  const handleLogin = () => {
-    if (email && password) setIsLoggedIn(true);
-    else Alert.alert("Kuskure", "Don Allah shigar da imel da kalmar sirri.");
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setMenuVisible(false);
+      router.replace('/login');
+    } catch (error) {
+      Alert.alert("Kuskure", "Ba a samu damar fita ba.");
+    }
   };
 
   const pickImage = async (mode: 'camera' | 'library') => {
@@ -48,13 +57,13 @@ export default function FarmerApp() {
     if (mode === 'camera') {
       result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
-        quality: 0.7,
+        quality: 0.5,
         base64: true
       });
     } else {
       result = await ImagePicker.launchImageLibraryAsync({
         allowsEditing: true,
-        quality: 0.7,
+        quality: 0.5,
         base64: true
       });
     }
@@ -78,37 +87,28 @@ export default function FarmerApp() {
         body: JSON.stringify({ image_data: base64Image }),
       });
       const data = await response.json();
-      setResult(data.analysis);
-      Speech.speak(data.analysis, { language: 'ha', pitch: 1.0, rate: 0.9 });
+      const analysisText = data.analysis;
+
+      setResult(analysisText);
+
+      // Adana a Firestore History
+      const user = auth.currentUser;
+      if (user && base64Image) {
+        await addDoc(collection(db, "history"), {
+          userId: user.uid,
+          image: `data:image/jpeg;base64,${base64Image}`,
+          result: analysisText,
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      Speech.speak(analysisText, { language: 'ha', pitch: 1.0, rate: 0.9 });
     } catch (error) {
       Alert.alert("Matsala", "Ba a samu damar tuntuɓar FarmerAI ba.");
     } finally {
       setLoading(false);
     }
   };
-
-  // --- UI Components ---
-  if (!isLoggedIn) {
-    return (
-      <View style={styles.authContainer}>
-        <ImageBackground source={{ uri: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?q=80&w=1000' }} style={styles.authBg}>
-          <View style={styles.overlay}>
-            <Text style={styles.authTitle}>FarmerAI 🌾</Text>
-            <Text style={styles.authSub}>Fasahar AI don Inganta Noma</Text>
-
-            <View style={styles.inputBox}>
-              <TextInput placeholder="Imel" style={styles.input} placeholderTextColor="#999" onChangeText={setEmail} />
-              <TextInput placeholder="Kalmar Sirri" secureTextEntry style={styles.input} placeholderTextColor="#999" onChangeText={setPassword} />
-              <TouchableOpacity style={styles.loginBtn} onPress={handleLogin}>
-                <Text style={styles.loginBtnText}>Shiga Ciki</Text>
-              </TouchableOpacity>
-              <Text style={styles.registerText}>Baka da asusu? <Text style={{ color: '#2E7D32', fontWeight: 'bold' }}>Yi Rajista</Text></Text>
-            </View>
-          </View>
-        </ImageBackground>
-      </View>
-    );
-  }
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F1F8E9' }}>
@@ -134,7 +134,6 @@ export default function FarmerApp() {
           <Ionicons name={weather.icon as any} size={50} color="#FFA000" />
         </View>
 
-        {/* Quick Actions */}
         <Text style={styles.sectionTitle}>Binciken FarmerAI</Text>
         <View style={styles.actionRow}>
           <TouchableOpacity style={styles.actionItem} onPress={() => pickImage('camera')}>
@@ -146,14 +145,12 @@ export default function FarmerApp() {
 
           <TouchableOpacity style={styles.actionItem} onPress={() => pickImage('library')}>
             <View style={[styles.iconCircle, { backgroundColor: '#8B4513' }]}>
-              {/* Gyaran Icon Name */}
               <MaterialCommunityIcons name="image-filter-center-focus" size={30} color="white" />
             </View>
-            <Text style={styles.actionLabel}>Analysis na Ƙasa</Text>
+            <Text style={styles.actionLabel}>Hoton Gona</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Result Area */}
         {loading && <ActivityIndicator size="large" color="#2E7D32" style={{ marginTop: 20 }} />}
 
         {result ? (
@@ -176,10 +173,10 @@ export default function FarmerApp() {
         )}
       </ScrollView>
 
-      {/* Footer Navigation */}
+      {/* Footer */}
       <View style={styles.footer}>
         <TouchableOpacity style={styles.footerItem}><Ionicons name="home" size={24} color="#2E7D32" /><Text style={styles.footerText}>Gida</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.footerItem}><Ionicons name="leaf" size={24} color="#999" /><Text style={styles.footerText}>Gona</Text></TouchableOpacity>
+        <TouchableOpacity style={styles.footerItem} onPress={() => router.push('/history')}><Ionicons name="leaf" size={24} color="#999" /><Text style={styles.footerText}>History</Text></TouchableOpacity>
         <TouchableOpacity style={styles.footerItem}><Ionicons name="chatbubbles" size={24} color="#999" /><Text style={styles.footerText}>Shawara</Text></TouchableOpacity>
         <TouchableOpacity style={styles.footerItem}><Ionicons name="person" size={24} color="#999" /><Text style={styles.footerText}>Profile</Text></TouchableOpacity>
       </View>
@@ -189,7 +186,6 @@ export default function FarmerApp() {
         <View style={styles.modalBg}>
           <View style={styles.confirmBox}>
             <Text style={styles.confirmTitle}>Tabbatar da Hoto</Text>
-            {/* Gyara don tabbatar image ba null bane */}
             {image && <Image source={{ uri: image }} style={styles.confirmImage} />}
             <Text style={styles.confirmInfo}>Shin hoton nan ya fito da kyau don bincike?</Text>
             <View style={styles.confirmButtons}>
@@ -214,7 +210,7 @@ export default function FarmerApp() {
               <Ionicons name="shield-checkmark-outline" size={20} /> <Text>Privacy Policy</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.menuItem}><Ionicons name="help-circle-outline" size={20} /> <Text>Taimako</Text></TouchableOpacity>
-            <TouchableOpacity style={[styles.menuItem, { marginTop: 20 }]} onPress={() => setIsLoggedIn(false)}>
+            <TouchableOpacity style={[styles.menuItem, { marginTop: 20 }]} onPress={handleLogout}>
               <Ionicons name="log-out-outline" size={20} color="red" /> <Text style={{ color: 'red' }}>Fita (Logout)</Text>
             </TouchableOpacity>
           </View>
@@ -250,16 +246,6 @@ export default function FarmerApp() {
 }
 
 const styles = StyleSheet.create({
-  authContainer: { flex: 1 },
-  authBg: { flex: 1, justifyContent: 'center' },
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 30 },
-  authTitle: { fontSize: 42, fontWeight: 'bold', color: 'white', textAlign: 'center' },
-  authSub: { fontSize: 18, color: '#F1F8E9', textAlign: 'center', marginBottom: 40 },
-  inputBox: { backgroundColor: 'white', borderRadius: 20, padding: 25, elevation: 10 },
-  input: { borderBottomWidth: 1, borderBottomColor: '#ddd', padding: 10, marginBottom: 20, fontSize: 16 },
-  loginBtn: { backgroundColor: '#2E7D32', padding: 15, borderRadius: 10, alignItems: 'center' },
-  loginBtnText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
-  registerText: { textAlign: 'center', marginTop: 15, color: '#666' },
   header: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 20, backgroundColor: 'white', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   dateText: { color: '#888', fontSize: 14 },
   greetingText: { fontSize: 22, fontWeight: 'bold', color: '#1B5E20' },
