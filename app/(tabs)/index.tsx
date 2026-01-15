@@ -72,7 +72,7 @@ export default function FarmerApp() {
     setResult('');
 
     try {
-      const response = await fetch('URL_NA_RENDER_DIN_KA/analyze', {
+      const response = await fetch('https://farmermobile.onrender.com/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image_data: base64Image }),
@@ -171,7 +171,7 @@ export default function FarmerApp() {
           </View>
         ) : (
           <View style={styles.infoCard}>
-            <Text style={styles.infoText}>FarmerAI zai taimake ka gano cutar shuka da kuma ingancin ƙasarka cikin daƙiƙa 10.</Text>
+            <Text style={styles.infoText}>FarmerAI zai taimake ka gano cutar shuka da kuma ingancin ƙasarka cikin daƙiƙu kadan.</Text>
           </View>
         )}
       </ScrollView>
@@ -191,7 +191,7 @@ export default function FarmerApp() {
             <Text style={styles.confirmTitle}>Tabbatar da Hoto</Text>
             {/* Gyara don tabbatar image ba null bane */}
             {image && <Image source={{ uri: image }} style={styles.confirmImage} />}
-            <Text style={styles.confirmInfo}>Shin hoton nan ya fito sarai don bincike?</Text>
+            <Text style={styles.confirmInfo}>Shin hoton nan ya fito da kyau don bincike?</Text>
             <View style={styles.confirmButtons}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowConfirmModal(false)}>
                 <Text style={styles.cancelText}>Sake Ɗauka</Text>
