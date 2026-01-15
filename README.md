@@ -1,50 +1,71 @@
-# Welcome to your Expo app 👋
+# FarmerAI  - Malamin Gona a Aljihunka
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+FarmerAI wata manhaja ce mai amfani da fasahar **Artificial Intelligence (AI)** don taimaka wa manoma gano cututtukan shuke-shuke, kwari, da matsalolin ƙasa cikin sauƙi ta amfani da hoton kyamara. An tsara manhajar musamman don manoman yankunanmu, inda take bayar da shawarwari cikin **Harshen Hausa**.
 
-## Get started
+##  Babban Manufa (Features)
+- **AI Crop Diagnosis:** Ɗauki hoton shuka, AI za ta gaya maka abin da ke damun ta.
+- **Hausa Voice Support:** App ɗin yana karanta bayanan binciken da muryar Hausa don taimaka wa manoman da ba su iya karatu ba.
+- **Multilingual Support:** Tattaunawa da AI cikin Hausa da Turanci.
+- **Expert Recommendations:** Bayar da shawarwari kan takin zamani, maganin fesa wa amfanin gona, da dabarun noma.
 
-1. Install dependencies
+##  Fasahar da aka Yi Amfani da Ita (Tech Stack)
 
-   ```bash
-   npm install
-   ```
+### Frontend (FarmerAI)
+- **Framework:** React Native (Expo)
+- **Language:** TypeScript/JavaScript
+- **Voice:** Expo Speech (TTS)
+- **Image Handling:** Expo Image Picker
 
-2. Start the app
+### Backend (FarmerMobile)
+- **Language:** Python
+- **Framework:** FastAPI
+- **AI Model:** Google Gemini 1.5 Flash (Multimodal)
+- **Deployment:** Render
 
-   ```bash
-   npx expo start
-   ```
 
-In the output, you'll find options to open the app in a
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Yadda Ake Saita Shi (Setup)
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+### 1. Saita Backend (FarmerMobile)
 
-## Get a fresh project
+# Shiga folder din backend
+cd FarmerMobile
 
-When you're ready, run:
+# Install dependencies
+python -m pip install -r requirements.txt
 
-```bash
-npm run reset-project
-```
+# Gudanar da server
+python main.py
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+# Shiga folder din frontend
+cd FarmerAI
 
-## Learn more
+# Install packages
+npm install
 
-To learn more about developing your project with Expo, look at the following resources:
+# Fara App din
+npx expo start
+FarmerAI/              # (Frontend Project)
+├── app/               # Babban code na App (index.tsx)
+├── assets/            # Hotuna da Icons
+├── app.json           # Saitin App (Package Name: com.zacsgaladi.farmerai)
+└── README.md          # Wannan bayanin
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+FarmerMobile/          # (Backend Project)
+├── main.py            # FastAPI Server (Kwakwalwar AI)
+├── requirements.txt   # Packages din Python
+└── .env               # Inda zaka saka Gemini API Key
 
-## Join the community
+ Tasiri ga Al'umma (Impact)
+An gina FarmerAI ne don rage asarar da manoma ke yi sakamakon makancewa ko rashin sanin cutar da ta kama amfanin gonarsu. Ta hanyar sauƙaƙa bayanan fasaha zuwa harshen Hausa, mun buɗe ƙofar cin gajiyar fasahar zamani ga kowa.
 
-Join our community of developers creating universal apps.
+ Tuntuɓa
+Idan kana da tambaya ko shawarar gyara, za ka iya tuntuɓata:
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Suna: Aminu Umar
+
+Email: aminugaladi90@gmail.com
+
+LinkedIn: 
+
+Gona mai albarka, rayuwa mai albarka!
