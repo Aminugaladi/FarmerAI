@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   StyleSheet, Text, View, TouchableOpacity, ScrollView, Image,
-  ActivityIndicator, TextInput, Modal, Dimensions, Alert, ImageBackground
+  ActivityIndicator, TextInput, Modal, Dimensions, Alert, KeyboardAvoidingView, Platform
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Speech from 'expo-speech';
@@ -24,10 +24,11 @@ export default function FarmerApp() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState('');
   const [greeting, setGreeting] = useState('');
+  const [question, setQuestion] = useState(''); // State don rubutun tambaya
   const [menuVisible, setMenuVisible] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [privacyVisible, setPrivacyVisible] = useState(false);
-  const [weather, setWeather] = useState({ temp: '32°C', status: 'Hasken Rana', icon: 'sunny' });
+  const [weather, setWeather] = useState({ temp: '36°C', status: 'Akwai Rana', icon: 'sunny' });
 
   // Date & Time
   const now = new Date();
@@ -54,18 +55,17 @@ export default function FarmerApp() {
 
   const pickImage = async (mode: 'camera' | 'library') => {
     let result;
+    const options: ImagePicker.ImagePickerOptions = {
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.3, // An rage nauyin hoton anan
+      base64: true,
+    };
+
     if (mode === 'camera') {
-      result = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        quality: 0.5,
-        base64: true
-      });
+      result = await ImagePicker.launchCameraAsync(options);
     } else {
-      result = await ImagePicker.launchImageLibraryAsync({
-        allowsEditing: true,
-        quality: 0.5,
-        base64: true
-      });
+      result = await ImagePicker.launchImageLibraryAsync(options);
     }
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -76,6 +76,12 @@ export default function FarmerApp() {
   };
 
   const startAnalysis = async () => {
+    // Tabbatar akwai hoto ko rubutu
+    if (!base64Image && !question.trim()) {
+      Alert.alert("Tsanaki", "Don Allah ɗauki hoto ko ka rubuta tambaya.");
+      return;
+    }
+
     setShowConfirmModal(false);
     setLoading(true);
     setResult('');
@@ -84,8 +90,12 @@ export default function FarmerApp() {
       const response = await fetch('https://farmermobile.onrender.com/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_data: base64Image }),
+        body: JSON.stringify({
+          image_data: base64Image || null,
+          text_query: question.trim() || null
+        }),
       });
+
       const data = await response.json();
       const analysisText = data.analysis;
 
@@ -93,16 +103,18 @@ export default function FarmerApp() {
 
       // Adana a Firestore History
       const user = auth.currentUser;
-      if (user && base64Image) {
+      if (user) {
         await addDoc(collection(db, "history"), {
           userId: user.uid,
-          image: `data:image/jpeg;base64,${base64Image}`,
+          image: base64Image ? `data:image/jpeg;base64,${base64Image}` : null,
+          question: question || null,
           result: analysisText,
           createdAt: serverTimestamp(),
         });
       }
 
       Speech.speak(analysisText, { language: 'ha', pitch: 1.0, rate: 0.9 });
+      setQuestion(''); // Goge tambayar bayan an gama
     } catch (error) {
       Alert.alert("Matsala", "Ba a samu damar tuntuɓar FarmerAI ba.");
     } finally {
@@ -111,7 +123,10 @@ export default function FarmerApp() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#F1F8E9' }}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={{ flex: 1, backgroundColor: '#F1F8E9' }}
+    >
       {/* Header */}
       <View style={styles.header}>
         <View>
@@ -129,12 +144,31 @@ export default function FarmerApp() {
           <View>
             <Text style={styles.weatherTemp}>{weather.temp}</Text>
             <Text style={styles.weatherStatus}>{weather.status}</Text>
-            <Text style={styles.weatherDesc}>Zai iya yin ruwa anjima kaɗan</Text>
+            <Text style={styles.weatherDesc}>Zafi ya kai 36°C yau</Text>
           </View>
           <Ionicons name={weather.icon as any} size={50} color="#FFA000" />
         </View>
 
-        <Text style={styles.sectionTitle}>Binciken FarmerAI</Text>
+        {/* Question Input Section */}
+        <View style={styles.questionSection}>
+          <Text style={styles.sectionTitle}>Menene matsalar ka yau? ✍️</Text>
+          <TextInput
+            style={styles.textInput}
+            placeholder="Rubuta tambayarka anan (Misali: Shuka ta tana bushewa...)"
+            placeholderTextColor="#999"
+            multiline
+            value={question}
+            onChangeText={setQuestion}
+          />
+          {question.length > 0 && !loading && (
+            <TouchableOpacity style={styles.sendTextBtn} onPress={startAnalysis}>
+              <Text style={styles.sendTextBtnText}>Tambayi FarmerAI</Text>
+              <Ionicons name="send" size={18} color="white" />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <Text style={styles.sectionTitle}>Binciken Hoto 📷</Text>
         <View style={styles.actionRow}>
           <TouchableOpacity style={styles.actionItem} onPress={() => pickImage('camera')}>
             <View style={[styles.iconCircle, { backgroundColor: '#2E7D32' }]}>
@@ -241,7 +275,7 @@ export default function FarmerApp() {
           </ScrollView>
         </View>
       </Modal>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -254,6 +288,10 @@ const styles = StyleSheet.create({
   weatherTemp: { fontSize: 32, fontWeight: 'bold', color: '#1B5E20' },
   weatherStatus: { fontSize: 18, color: '#2E7D32', fontWeight: 'bold' },
   weatherDesc: { color: '#666', fontSize: 12 },
+  questionSection: { backgroundColor: 'white', padding: 15, borderRadius: 15, marginBottom: 25, elevation: 3 },
+  textInput: { height: 80, textAlignVertical: 'top', color: '#333', fontSize: 16, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  sendTextBtn: { backgroundColor: '#2E7D32', flexDirection: 'row', padding: 10, borderRadius: 10, alignSelf: 'flex-end', marginTop: 10, alignItems: 'center', gap: 5 },
+  sendTextBtnText: { color: 'white', fontWeight: 'bold' },
   sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 15 },
   actionRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 30 },
   actionItem: { width: '45%', alignItems: 'center' },
@@ -265,7 +303,7 @@ const styles = StyleSheet.create({
   resultContent: { fontSize: 16, lineHeight: 26, color: '#444' },
   backBtn: { marginTop: 20, alignItems: 'center', padding: 10 },
   backBtnText: { color: '#8B4513', fontWeight: 'bold' },
-  infoCard: { padding: 40, alignItems: 'center' },
+  infoCard: { padding: 20, alignItems: 'center' },
   infoText: { textAlign: 'center', color: '#999', lineHeight: 22 },
   footer: { position: 'absolute', bottom: 0, width: '100%', height: 70, backgroundColor: 'white', flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', elevation: 20 },
   footerItem: { alignItems: 'center' },
