@@ -10,7 +10,10 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.zacsgaladi.farmerai"
+      "bundleIdentifier": "com.zacsgaladi.farmerai",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Muna bukatar sanin inda kake don nuna maka yanayin gari (Weather)."
+      }
     },
     "android": {
       "package": "com.zacsgaladi.farmerai",
@@ -23,10 +26,11 @@
       },
       "permissions": [
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.FOREGROUND_SERVICE"
       ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": true
@@ -54,6 +58,12 @@
         {
           "photosPermission": "Bada izinin shiga hotunanka don duba amfanin gona.",
           "cameraPermission": "Bada izinin amfani da kyamara don daukar hoton shuka."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysPermission": "Bada izinin gano inda kake don bayanin yanayin gari."
         }
       ]
     ],

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // useEffect
 import {
     StyleSheet,
     Text,
@@ -12,16 +12,34 @@ import {
     ActivityIndicator
 } from 'react-native';
 import { auth } from '../firebaseConfig';
-import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth'; // Na ƙara sendPasswordResetEmail
+import {
+    signInWithEmailAndPassword,
+    sendPasswordResetEmail,
+    onAuthStateChanged
+} from 'firebase/auth'; // onAuthStateChanged
 import { useRouter } from 'expo-router';
 
 export default function LoginScreen() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true); // Don duba session a farko
     const router = useRouter();
 
-    // --- Function na Shiga (Login) ---
+    // --- Bangaren ajiye login ---
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // Idan akwai login a ajiye
+                router.replace('/(tabs)');
+            } else {
+                // In babu kowa, tsaya a shafin login
+                setLoading(false);
+            }
+        });
+
+        return unsubscribe; // Kashe sauraro (cleanup)
+    }, []);
+
     const handleLogin = async () => {
         if (!email || !password) {
             Alert.alert('Kuskure', 'Da fatan ka cika imel da kalmar sirri');
@@ -40,12 +58,10 @@ export default function LoginScreen() {
                 errorMessage = 'Wannan imel din ba daidai yake ba.';
             }
             Alert.alert('Kuskure', errorMessage);
-        } finally {
-            setLoading(false);
+            setLoading(false); // Kashe loading idan aka samu matsala
         }
     };
 
-    // --- Sabon Function na Manta Password ---
     const handleForgotPassword = async () => {
         if (!email) {
             Alert.alert('Tsanaki', 'Don Allah shigar da imel dinka a filin sama tukunna, sannan ka danna nan.');
@@ -71,6 +87,16 @@ export default function LoginScreen() {
             ]
         );
     };
+
+    // Wurin nuna session
+    if (loading && !email) {
+        return (
+            <View style={[styles.container, { justifyContent: 'center' }]}>
+                <ActivityIndicator size="large" color="#2E7D32" />
+                <Text style={{ textAlign: 'center', marginTop: 10, color: '#2E7D32' }}>Loading...</Text>
+            </View>
+        );
+    }
 
     return (
         <KeyboardAvoidingView
@@ -119,7 +145,6 @@ export default function LoginScreen() {
                         <Text style={styles.registerLinkText}>Ba ku da account? <Text style={{ fontWeight: 'bold' }}>Yi Rajista</Text></Text>
                     </TouchableOpacity>
 
-                    {/* Na hada wannan button din da sabon function din */}
                     <TouchableOpacity style={styles.forgotPass} onPress={handleForgotPassword}>
                         <Text style={styles.forgotPassText}>An manta kalmar sirri?</Text>
                     </TouchableOpacity>

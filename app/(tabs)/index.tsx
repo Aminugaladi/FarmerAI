@@ -6,6 +6,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as Speech from 'expo-speech';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 
 // Firebase Imports
 import { auth, db } from '../../firebaseConfig';
@@ -24,24 +25,59 @@ export default function FarmerApp() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState('');
   const [greeting, setGreeting] = useState('');
-  const [question, setQuestion] = useState(''); // State don rubutun tambaya
+  const [question, setQuestion] = useState('');
   const [menuVisible, setMenuVisible] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [privacyVisible, setPrivacyVisible] = useState(false);
-  const [weather, setWeather] = useState({ temp: '36°C', status: 'Akwai Rana', icon: 'sunny' });
+
+  // Real-time Weather State
+  const [weather, setWeather] = useState({ temp: '--°C', status: 'Loading...', icon: 'cloud-outline' });
 
   // Date & Time
   const now = new Date();
   const dateString = now.toLocaleDateString('ha-NG', { weekday: 'long', day: 'numeric', month: 'long' });
 
   useEffect(() => {
+    // Saita gaisuwa
     const hours = now.getHours();
     if (hours < 12) setGreeting('Ina kwana, Barka da Safiya');
     else if (hours < 16) setGreeting('Barka da Rana, ya aikin gona?');
     else setGreeting('Barka da Yamma, ya hutu?');
+
+    // Nemo yanayin gari na gaskiya
+    fetchWeather();
   }, []);
 
-  // --- Functions ---
+  const fetchWeather = async () => {
+    try {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setWeather({ temp: '32°C', status: 'Babu Izini', icon: 'sunny' });
+        return;
+      }
+
+      let location = await Location.getCurrentPositionAsync({});
+      const lat = location.coords.latitude;
+      const lon = location.coords.longitude;
+
+      const response = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`
+      );
+      const data = await response.json();
+      const temp = Math.round(data.current_weather.temperature);
+      const code = data.current_weather.weathercode;
+
+      // Saita Icon da Text dangane da lambar yanayi
+      let statusText = 'Hasken Rana';
+      let iconName = 'sunny';
+      if (code > 0 && code < 45) { statusText = 'Akwai Gajimare'; iconName = 'cloud'; }
+      else if (code >= 45) { statusText = 'Ana Ruwa'; iconName = 'rainy'; }
+
+      setWeather({ temp: `${temp}°C`, status: statusText, icon: iconName });
+    } catch (error) {
+      setWeather({ temp: '30°C', status: 'Haske', icon: 'sunny' });
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -58,7 +94,7 @@ export default function FarmerApp() {
     const options: ImagePicker.ImagePickerOptions = {
       allowsEditing: true,
       aspect: [4, 3],
-      quality: 0.3, // An rage nauyin hoton anan
+      quality: 0.3,
       base64: true,
     };
 
@@ -76,7 +112,6 @@ export default function FarmerApp() {
   };
 
   const startAnalysis = async () => {
-    // Tabbatar akwai hoto ko rubutu
     if (!base64Image && !question.trim()) {
       Alert.alert("Tsanaki", "Don Allah ɗauki hoto ko ka rubuta tambaya.");
       return;
@@ -97,24 +132,21 @@ export default function FarmerApp() {
       });
 
       const data = await response.json();
-      const analysisText = data.analysis;
+      setResult(data.analysis);
 
-      setResult(analysisText);
-
-      // Adana a Firestore History
       const user = auth.currentUser;
       if (user) {
         await addDoc(collection(db, "history"), {
           userId: user.uid,
           image: base64Image ? `data:image/jpeg;base64,${base64Image}` : null,
           question: question || null,
-          result: analysisText,
+          result: data.analysis,
           createdAt: serverTimestamp(),
         });
       }
 
-      Speech.speak(analysisText, { language: 'ha', pitch: 1.0, rate: 0.9 });
-      setQuestion(''); // Goge tambayar bayan an gama
+      Speech.speak(data.analysis, { language: 'ha', pitch: 1.0, rate: 0.9 });
+      setQuestion('');
     } catch (error) {
       Alert.alert("Matsala", "Ba a samu damar tuntuɓar FarmerAI ba.");
     } finally {
@@ -127,7 +159,6 @@ export default function FarmerApp() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={{ flex: 1, backgroundColor: '#F1F8E9' }}
     >
-      {/* Header */}
       <View style={styles.header}>
         <View>
           <Text style={styles.dateText}>{dateString}</Text>
@@ -144,17 +175,25 @@ export default function FarmerApp() {
           <View>
             <Text style={styles.weatherTemp}>{weather.temp}</Text>
             <Text style={styles.weatherStatus}>{weather.status}</Text>
-            <Text style={styles.weatherDesc}>Zafi ya kai 36°C yau</Text>
+            <Text style={styles.weatherDesc}>Yanayin lokacin yanzu</Text>
           </View>
           <Ionicons name={weather.icon as any} size={50} color="#FFA000" />
         </View>
 
-        {/* Question Input Section */}
+        {/* Info Text (Moved to top as requested) */}
+        {!result && (
+          <View style={styles.infoCardTop}>
+            <Text style={styles.infoText}>
+              FarmerAI zai taimake ka gano cutar shuka da kuma ingancin ƙasar gonarka.
+            </Text>
+          </View>
+        )}
+
         <View style={styles.questionSection}>
           <Text style={styles.sectionTitle}>Menene matsalar ka yau? ✍️</Text>
           <TextInput
             style={styles.textInput}
-            placeholder="Rubuta tambayarka anan (Misali: Shuka ta tana bushewa...)"
+            placeholder="Rubuta tambayarka anan..."
             placeholderTextColor="#999"
             multiline
             value={question}
@@ -187,7 +226,7 @@ export default function FarmerApp() {
 
         {loading && <ActivityIndicator size="large" color="#2E7D32" style={{ marginTop: 20 }} />}
 
-        {result ? (
+        {result && (
           <View style={styles.resultBox}>
             <View style={styles.resultHeader}>
               <Text style={styles.resultTitle}>Sakamakon FarmerAI</Text>
@@ -200,10 +239,6 @@ export default function FarmerApp() {
               <Text style={styles.backBtnText}>Goge/Sake Wani</Text>
             </TouchableOpacity>
           </View>
-        ) : (
-          <View style={styles.infoCard}>
-            <Text style={styles.infoText}>FarmerAI zai taimake ka gano cutar shuka da kuma ingancin ƙasarka cikin daƙiƙu kadan.</Text>
-          </View>
         )}
       </ScrollView>
 
@@ -215,7 +250,7 @@ export default function FarmerApp() {
         <TouchableOpacity style={styles.footerItem}><Ionicons name="person" size={24} color="#999" /><Text style={styles.footerText}>Profile</Text></TouchableOpacity>
       </View>
 
-      {/* Image Confirmation Modal */}
+      {/* Modal segments remained same as provided */}
       <Modal visible={showConfirmModal} transparent animationType="fade">
         <View style={styles.modalBg}>
           <View style={styles.confirmBox}>
@@ -234,7 +269,6 @@ export default function FarmerApp() {
         </View>
       </Modal>
 
-      {/* Side Menu Modal */}
       <Modal visible={menuVisible} transparent animationType="slide">
         <TouchableOpacity style={styles.modalBg} onPress={() => setMenuVisible(false)}>
           <View style={styles.sideMenu}>
@@ -251,7 +285,6 @@ export default function FarmerApp() {
         </TouchableOpacity>
       </Modal>
 
-      {/* Privacy Policy Modal */}
       <Modal visible={privacyVisible} animationType="slide">
         <View style={styles.privacyContainer}>
           <View style={styles.privacyHeader}>
@@ -284,10 +317,12 @@ const styles = StyleSheet.create({
   dateText: { color: '#888', fontSize: 14 },
   greetingText: { fontSize: 22, fontWeight: 'bold', color: '#1B5E20' },
   mainContent: { padding: 20 },
-  weatherCard: { backgroundColor: '#E8F5E9', borderRadius: 20, padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25 },
+  weatherCard: { backgroundColor: '#E8F5E9', borderRadius: 20, padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
   weatherTemp: { fontSize: 32, fontWeight: 'bold', color: '#1B5E20' },
   weatherStatus: { fontSize: 18, color: '#2E7D32', fontWeight: 'bold' },
   weatherDesc: { color: '#666', fontSize: 12 },
+  infoCardTop: { paddingVertical: 10, paddingHorizontal: 5, marginBottom: 20 },
+  infoText: { textAlign: 'left', color: '#555', lineHeight: 20, fontSize: 14 },
   questionSection: { backgroundColor: 'white', padding: 15, borderRadius: 15, marginBottom: 25, elevation: 3 },
   textInput: { height: 80, textAlignVertical: 'top', color: '#333', fontSize: 16, borderBottomWidth: 1, borderBottomColor: '#eee' },
   sendTextBtn: { backgroundColor: '#2E7D32', flexDirection: 'row', padding: 10, borderRadius: 10, alignSelf: 'flex-end', marginTop: 10, alignItems: 'center', gap: 5 },
@@ -303,8 +338,6 @@ const styles = StyleSheet.create({
   resultContent: { fontSize: 16, lineHeight: 26, color: '#444' },
   backBtn: { marginTop: 20, alignItems: 'center', padding: 10 },
   backBtnText: { color: '#8B4513', fontWeight: 'bold' },
-  infoCard: { padding: 20, alignItems: 'center' },
-  infoText: { textAlign: 'center', color: '#999', lineHeight: 22 },
   footer: { position: 'absolute', bottom: 0, width: '100%', height: 70, backgroundColor: 'white', flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', elevation: 20 },
   footerItem: { alignItems: 'center' },
   footerText: { fontSize: 12, marginTop: 4 },
