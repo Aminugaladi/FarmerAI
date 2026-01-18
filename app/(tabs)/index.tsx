@@ -25,6 +25,7 @@ export default function FarmerApp() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState('');
   const [greeting, setGreeting] = useState('');
+  const [userName, setUserName] = useState('');
   const [question, setQuestion] = useState('');
   const [menuVisible, setMenuVisible] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -38,13 +39,19 @@ export default function FarmerApp() {
   const dateString = now.toLocaleDateString('ha-NG', { weekday: 'long', day: 'numeric', month: 'long' });
 
   useEffect(() => {
-    // Saita gaisuwa
-    const hours = now.getHours();
-    if (hours < 12) setGreeting('Ina kwana, Barka da Safiya');
-    else if (hours < 16) setGreeting('Barka da Rana, ya aikin gona?');
-    else setGreeting('Barka da Yamma, ya hutu?');
+    // Saita sunan mai amfani daga Firebase
+    const user = auth.currentUser;
+    if (user) {
+      const name = user.displayName || user.email?.split('@')[0] || 'Manomi';
+      setUserName(name.charAt(0).toUpperCase() + name.slice(1));
+    }
 
-    // Nemo yanayin gari na gaskiya
+    // Saita gaisuwa dangane da lokaci
+    const hours = now.getHours();
+    if (hours < 12) setGreeting('Barka da Safiya');
+    else if (hours < 16) setGreeting('Barka da Rana');
+    else setGreeting('Barka da Yamma');
+
     fetchWeather();
   }, []);
 
@@ -67,7 +74,6 @@ export default function FarmerApp() {
       const temp = Math.round(data.current_weather.temperature);
       const code = data.current_weather.weathercode;
 
-      // Saita Icon da Text dangane da lambar yanayi
       let statusText = 'Hasken Rana';
       let iconName = 'sunny';
       if (code > 0 && code < 45) { statusText = 'Akwai Gajimare'; iconName = 'cloud'; }
@@ -122,32 +128,39 @@ export default function FarmerApp() {
     setResult('');
 
     try {
+      // GYARA: Tura "" maimakon null don magance 422 error
+      const payload = {
+        image_data: base64Image || "",
+        text_query: question.trim() || ""
+      };
+
       const response = await fetch('https://farmermobile.onrender.com/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          image_data: base64Image || null,
-          text_query: question.trim() || null
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
-      setResult(data.analysis);
 
-      const user = auth.currentUser;
-      if (user) {
-        await addDoc(collection(db, "history"), {
-          userId: user.uid,
-          image: base64Image ? `data:image/jpeg;base64,${base64Image}` : null,
-          question: question || null,
-          result: data.analysis,
-          createdAt: serverTimestamp(),
-        });
+      if (response.ok) {
+        setResult(data.analysis);
+        const user = auth.currentUser;
+        if (user) {
+          await addDoc(collection(db, "history"), {
+            userId: user.uid,
+            image: base64Image ? `data:image/jpeg;base64,${base64Image}` : null,
+            question: question || null,
+            result: data.analysis,
+            createdAt: serverTimestamp(),
+          });
+        }
+        Speech.speak(data.analysis, { language: 'ha', pitch: 1.0, rate: 0.9 });
+        setQuestion('');
+      } else {
+        throw new Error(data.detail || "Server error");
       }
-
-      Speech.speak(data.analysis, { language: 'ha', pitch: 1.0, rate: 0.9 });
-      setQuestion('');
     } catch (error) {
+      console.error(error);
       Alert.alert("Matsala", "Ba a samu damar tuntuɓar FarmerAI ba.");
     } finally {
       setLoading(false);
@@ -162,7 +175,7 @@ export default function FarmerApp() {
       <View style={styles.header}>
         <View>
           <Text style={styles.dateText}>{dateString}</Text>
-          <Text style={styles.greetingText}>{greeting}</Text>
+          <Text style={styles.greetingText}>{greeting}, {userName}</Text>
         </View>
         <TouchableOpacity onPress={() => setMenuVisible(true)}>
           <Ionicons name="ellipsis-vertical" size={28} color="#1B5E20" />
@@ -170,7 +183,6 @@ export default function FarmerApp() {
       </View>
 
       <ScrollView contentContainerStyle={styles.mainContent}>
-        {/* Weather Card */}
         <View style={styles.weatherCard}>
           <View>
             <Text style={styles.weatherTemp}>{weather.temp}</Text>
@@ -180,12 +192,18 @@ export default function FarmerApp() {
           <Ionicons name={weather.icon as any} size={50} color="#FFA000" />
         </View>
 
-        {/* Info Text (Moved to top as requested) */}
-        {!result && (
+        {!result && !loading && (
           <View style={styles.infoCardTop}>
             <Text style={styles.infoText}>
               FarmerAI zai taimake ka gano cutar shuka da kuma ingancin ƙasar gonarka.
             </Text>
+          </View>
+        )}
+
+        {loading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#2E7D32" />
+            <Text style={styles.loadingText}>FarmerAI yana nazari, dakata kadan...</Text>
           </View>
         )}
 
@@ -209,22 +227,20 @@ export default function FarmerApp() {
 
         <Text style={styles.sectionTitle}>Binciken Hoto 📷</Text>
         <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.actionItem} onPress={() => pickImage('camera')}>
+          <TouchableOpacity style={styles.actionItem} onPress={() => pickImage('camera')} disabled={loading}>
             <View style={[styles.iconCircle, { backgroundColor: '#2E7D32' }]}>
               <Ionicons name="camera" size={30} color="white" />
             </View>
             <Text style={styles.actionLabel}>Duba Shuka</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionItem} onPress={() => pickImage('library')}>
+          <TouchableOpacity style={styles.actionItem} onPress={() => pickImage('library')} disabled={loading}>
             <View style={[styles.iconCircle, { backgroundColor: '#8B4513' }]}>
               <MaterialCommunityIcons name="image-filter-center-focus" size={30} color="white" />
             </View>
             <Text style={styles.actionLabel}>Hoton Gona</Text>
           </TouchableOpacity>
         </View>
-
-        {loading && <ActivityIndicator size="large" color="#2E7D32" style={{ marginTop: 20 }} />}
 
         {result && (
           <View style={styles.resultBox}>
@@ -240,17 +256,37 @@ export default function FarmerApp() {
             </TouchableOpacity>
           </View>
         )}
+
+        <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Footer */}
-      <View style={styles.footer}>
-        <TouchableOpacity style={styles.footerItem}><Ionicons name="home" size={24} color="#2E7D32" /><Text style={styles.footerText}>Gida</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.footerItem} onPress={() => router.push('/history')}><Ionicons name="leaf" size={24} color="#999" /><Text style={styles.footerText}>History</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.footerItem}><Ionicons name="chatbubbles" size={24} color="#999" /><Text style={styles.footerText}>Shawara</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.footerItem}><Ionicons name="person" size={24} color="#999" /><Text style={styles.footerText}>Profile</Text></TouchableOpacity>
+      {/* Footer Container */}
+      <View style={styles.footerContainer}>
+        <View style={styles.footerTop}>
+          <Text style={styles.footerAppName}>FarmerAI</Text>
+          <Text style={styles.footerMotto}>Abokin Manomi na Kwarai 🌿</Text>
+        </View>
+        <View style={styles.footerTabs}>
+          <TouchableOpacity style={styles.footerItem}>
+            <Ionicons name="home" size={22} color="#2E7D32" />
+            <Text style={[styles.footerText, { color: '#2E7D32' }]}>Gida</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.footerItem} onPress={() => router.push('/history')}>
+            <Ionicons name="leaf" size={22} color="#999" />
+            <Text style={styles.footerText}>History</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.footerItem}>
+            <Ionicons name="chatbubbles" size={22} color="#999" />
+            <Text style={styles.footerText}>Shawara</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.footerItem}>
+            <Ionicons name="person" size={22} color="#999" />
+            <Text style={styles.footerText}>Profile</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Modal segments remained same as provided */}
+      {/* Modals remained the same */}
       <Modal visible={showConfirmModal} transparent animationType="fade">
         <View style={styles.modalBg}>
           <View style={styles.confirmBox}>
@@ -313,9 +349,9 @@ export default function FarmerApp() {
 }
 
 const styles = StyleSheet.create({
-  header: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 20, backgroundColor: 'white', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  dateText: { color: '#888', fontSize: 14 },
-  greetingText: { fontSize: 22, fontWeight: 'bold', color: '#1B5E20' },
+  header: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 20, backgroundColor: 'white', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', elevation: 2 },
+  dateText: { color: '#888', fontSize: 13 },
+  greetingText: { fontSize: 20, fontWeight: 'bold', color: '#1B5E20' },
   mainContent: { padding: 20 },
   weatherCard: { backgroundColor: '#E8F5E9', borderRadius: 20, padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
   weatherTemp: { fontSize: 32, fontWeight: 'bold', color: '#1B5E20' },
@@ -323,6 +359,8 @@ const styles = StyleSheet.create({
   weatherDesc: { color: '#666', fontSize: 12 },
   infoCardTop: { paddingVertical: 10, paddingHorizontal: 5, marginBottom: 20 },
   infoText: { textAlign: 'left', color: '#555', lineHeight: 20, fontSize: 14 },
+  loadingContainer: { alignItems: 'center', marginVertical: 20 },
+  loadingText: { marginTop: 10, color: '#2E7D32', fontWeight: 'bold' },
   questionSection: { backgroundColor: 'white', padding: 15, borderRadius: 15, marginBottom: 25, elevation: 3 },
   textInput: { height: 80, textAlignVertical: 'top', color: '#333', fontSize: 16, borderBottomWidth: 1, borderBottomColor: '#eee' },
   sendTextBtn: { backgroundColor: '#2E7D32', flexDirection: 'row', padding: 10, borderRadius: 10, alignSelf: 'flex-end', marginTop: 10, alignItems: 'center', gap: 5 },
@@ -332,15 +370,19 @@ const styles = StyleSheet.create({
   actionItem: { width: '45%', alignItems: 'center' },
   iconCircle: { width: 70, height: 70, borderRadius: 35, justifyContent: 'center', alignItems: 'center', marginBottom: 10, elevation: 5 },
   actionLabel: { fontWeight: 'bold', color: '#333' },
-  resultBox: { backgroundColor: 'white', borderRadius: 20, padding: 20, elevation: 5, marginBottom: 100 },
+  resultBox: { backgroundColor: 'white', borderRadius: 20, padding: 20, elevation: 5, marginBottom: 20 },
   resultHeader: { flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#eee', paddingBottom: 10, marginBottom: 15 },
   resultTitle: { fontSize: 18, fontWeight: 'bold', color: '#1B5E20' },
   resultContent: { fontSize: 16, lineHeight: 26, color: '#444' },
   backBtn: { marginTop: 20, alignItems: 'center', padding: 10 },
   backBtnText: { color: '#8B4513', fontWeight: 'bold' },
-  footer: { position: 'absolute', bottom: 0, width: '100%', height: 70, backgroundColor: 'white', flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', elevation: 20 },
+  footerContainer: { position: 'absolute', bottom: 0, width: '100%', backgroundColor: 'white', elevation: 25, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  footerTop: { alignItems: 'center', paddingTop: 10, borderBottomWidth: 0.5, borderBottomColor: '#eee', paddingBottom: 5 },
+  footerAppName: { fontSize: 16, fontWeight: 'bold', color: '#2E7D32' },
+  footerMotto: { fontSize: 10, color: '#666', fontStyle: 'italic' },
+  footerTabs: { height: 60, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' },
   footerItem: { alignItems: 'center' },
-  footerText: { fontSize: 12, marginTop: 4 },
+  footerText: { fontSize: 10, marginTop: 2, color: '#999' },
   modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },
   confirmBox: { width: '85%', backgroundColor: 'white', borderRadius: 20, padding: 20, alignItems: 'center' },
   confirmTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 15 },
